@@ -6,6 +6,7 @@ docs/sphinx/source/_build/
 __pycache__/
 .pytest_cache/
 .vscode/
+torchlogs/
 *outputs/
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
