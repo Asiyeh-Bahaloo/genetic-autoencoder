@@ -1,0 +1,9 @@
+output_dir: "/output/test_working_hyd"
+data_path: "../data"
+device: "cpu"
+shape_list: [784, 20, 10 , 5 , 1]
+batch_size: 32
+pop_size: 10 
+generations: 2
+finetune_epoch: 0
+finetune_lr: 0.01
