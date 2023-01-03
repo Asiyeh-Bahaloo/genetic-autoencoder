@@ -73,7 +73,7 @@ class GeneticTiedAutoEncoder(TiedAutoEncoder):
         new_chromosome = parent1 * weights_mask + parent2 * weights_mask.logical_not()
 
         child = GeneticTiedAutoEncoder(self.shape_list, self.nonlinearity)
-        child.state_dict()[layer_key] = weights_mask
+        child.state_dict()[layer_key] = new_chromosome
         return child
 
     @torch.no_grad()
