@@ -27,13 +27,8 @@ def train(model, device, train_loader, optimizer, epoch, loss_fn=F.mse_loss):
         optimizer.step()
         if batch_idx % 1000 == 0:
             print(
-                "Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}".format(
-                    epoch,
-                    batch_idx * len(data),
-                    len(train_loader.dataset),
-                    100.0 * batch_idx / len(train_loader),
-                    loss.item(),
-                )
+                f"""Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)}
+                ({100.0 * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}"""
             )
 
 
@@ -90,7 +85,7 @@ def train_genetic_model(
 ):
 
     # Generate choromosomes
-    print("\nGenerated {0} models with {1} layer size! ".format(pop_size, shape_list))
+    print(f"\nGenerated {pop_size} models with {shape_list} layer size! ")
     models = [
         GeneticTiedAutoEncoder(shape_list, nonlinearity=torch.relu)
         for i in range(pop_size)
@@ -104,17 +99,15 @@ def train_genetic_model(
         shapes = []
         for key_weight in prev_weights:
             shapes.append(prev_weights[key_weight].shape)
-        print("\nLoaded prevoius layer weights with shape {0}".format(shapes))
+        print(f"\nLoaded prevoius layer weights with shape {shapes}")
 
     layer_key = next(reversed(models[0].state_dict()))  # last layer key
     print(
-        "\nTraining {0} with shape of {1} : ".format(
-            layer_key, models[0].state_dict()[layer_key].shape
-        )
+        f"\nTraining {layer_key} with shape of {models[0].state_dict()[layer_key].shape} : "
     )
 
     for g in range(generations):
-        print("\nGeneration {0}: \n".format(g + 1))
+        print(f"\nGeneration {g + 1}: \n")
         print("Calculating fitness for each chromosome...")
         # fitness
         fitness = []
@@ -124,7 +117,7 @@ def train_genetic_model(
         # Select 5 best models (/choromosomes)
         fit_arg = np.argsort(fitness)
         selected_models = [models[f] for f in fit_arg[: pop_size // 2]]
-        print("Selected {0} Top best chromosomes".format(pop_size // 2))
+        print(f"Selected {pop_size // 2} Top best chromosomes")
 
         # finetune selected models
         print("Finetuning selected models...\n")
@@ -143,9 +136,7 @@ def train_genetic_model(
 
         # cross over and mutation
         print(
-            "Generate {0} other chromosomes with Cross-Over and Mutation\n".format(
-                pop_size // 2
-            )
+            f"Generate {pop_size // 2} other chromosomes with Cross-Over and Mutation\n"
         )
         for _ in range(pop_size // 2):
             mom_idx = np.random.randint(low=0, high=pop_size // 2)
