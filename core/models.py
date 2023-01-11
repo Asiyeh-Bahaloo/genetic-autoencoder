@@ -25,7 +25,7 @@ class TiedLinearLayer(nn.Module):
         input : torch.tensor
             The input tensor for the layer.
         transpose : bool
-            If false, the layer is in the decoder part; otherwise, the layer is in the encoder
+            If False, the layer is in the decoder part; otherwise, the layer is in the encoder
             part, and the weights need to be transposed.
 
         Returns

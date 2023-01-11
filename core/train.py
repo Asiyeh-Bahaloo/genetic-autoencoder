@@ -128,11 +128,11 @@ def train_genetic_model(
     train_loader,
     pop_size,
     generations,
-    prev_weights={},
+    device,
+    prev_weights=None,
     finetune_epoch=3,
     finetune_lr=0.01,
     loss_fn=F.mse_loss,
-    device="cpu",
 ):
     """Train the last layer in a GeneticTiedAutoEncoder model using a genetic algorithm.
 
@@ -146,8 +146,10 @@ def train_genetic_model(
         Population size of chromosomes.
     generations : int
         The total training generations.
+    device : torch.device
+        Specify which device (cpu or GPU) should be used for training.
     prev_weights : dict, optional
-        Previous layer weights that should be loaded into the model, by default {}
+        Previous layer weights that should be loaded into the model, by default None
     finetune_epoch : int, optional
         The number of epochs we finetune chromosomes using the stochastic gradient descent
         algorithm, by default 3
@@ -155,8 +157,7 @@ def train_genetic_model(
         Learning rate for finetuning, by default 0.01
     loss_fn : function, optional
         Loss function for finetuning, by default F.mse_loss
-    device : str, optional
-        "cpu" or "gpu", by default "cpu"
+
 
     Returns
     -------
@@ -173,7 +174,7 @@ def train_genetic_model(
 
     # Load prevoius layer weights
     print()
-    if prev_weights != {}:
+    if prev_weights is not None:
         for model in models:
             model.load_state_dict(prev_weights, strict=False)
         shapes = []
@@ -244,10 +245,10 @@ def layerwise_genetic_train(
     train_loader,
     pop_size,
     generations,
+    device,
     finetune_epoch=3,
     finetune_lr=0.01,
     loss_fn=F.mse_loss,
-    device="cpu",
 ):
     """Builds and trains the whole GeneticTiedAutoEncoder model in a layer-wise manner using
     the genetic algorithm.
@@ -262,6 +263,8 @@ def layerwise_genetic_train(
         Population size of chromosomes.
     generations : int
         The total training generations.
+    device : torch.device
+        Specify which device (cpu or GPU) should be used for training.
     finetune_epoch : int, optional
         The number of epochs we finetune chromosomes using the stochastic gradient descent
         algorithm, by default 3
@@ -269,8 +272,7 @@ def layerwise_genetic_train(
         Learning rate for finetuning, by default 0.01
     loss_fn : function, optional
         Loss function for finetuning, by default F.mse_loss
-    device : str, optional
-        "cpu" or "gpu", by default "cpu"
+
 
     Returns
     -------
@@ -278,7 +280,7 @@ def layerwise_genetic_train(
        A GeneticTiedAutoEncoder containing the best learned weights.
     """
     current_shape_list = []
-    weight_state_dict = {}
+    weight_state_dict = None
 
     for layer_shape in shape_list:
         current_shape_list.append(layer_shape)
@@ -290,12 +292,13 @@ def layerwise_genetic_train(
             train_loader,
             pop_size,
             generations,
+            device,
             weight_state_dict,
             finetune_epoch,
             finetune_lr,
             loss_fn,
-            device,
         )
+        # update the previous weights
         weight_state_dict = model.state_dict()
     return model
 
@@ -322,9 +325,9 @@ def main(cfg: DictConfig):
         train_loader,
         cfg.pop_size,
         cfg.generations,
+        device,
         cfg.finetune_epoch,
         cfg.finetune_lr,
-        device,
     )
 
     return model
