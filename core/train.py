@@ -1,18 +1,24 @@
+import os
+import logging
+import pickle
+from sklearn import svm
+import numpy as np
+
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
 from torchvision import datasets
 from torchvision import transforms
 
-
-import numpy as np
-import hydra
 from omegaconf import DictConfig
+import hydra
 
+import matplotlib.pyplot as plt
 
-# import matplotlib.pyplot as plt
 # from genetic_autoencoder.core.models import *
 from models import TiedAutoEncoder, GeneticTiedAutoEncoder
+
+log = logging.getLogger(__name__)
 
 
 def train(model, device, train_loader, optimizer, epoch, loss_fn=F.mse_loss):
@@ -43,7 +49,7 @@ def train(model, device, train_loader, optimizer, epoch, loss_fn=F.mse_loss):
         loss.backward()
         optimizer.step()
         if batch_idx % 1000 == 0:
-            print(
+            log.info(
                 f"""Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)}
                 ({100.0 * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}"""
             )
@@ -70,9 +76,43 @@ def evaluate_loss(model, data_loader, device):
     val_loss = 0
     for data, _ in data_loader:
         data = data.to(device)
-        _, reconstructed_output = model(data)
+        _, pred = model(data)
         target = torch.flatten(data, start_dim=1)
-        loss = F.mse_loss(reconstructed_output, target)
+        loss = F.mse_loss(pred, target)
+        val_loss += loss
+
+    validation_loss = val_loss / len(data_loader)
+    return validation_loss
+
+
+@torch.no_grad()
+def evaluate_classification_model(model, clf, data_loader, device):
+    """Evaluate the model and calculate the MSE loss for classification.
+
+    Parameters
+    ----------
+    model : nn.Module_
+        Model for the evaluation purposes.
+    data_loader : torch.DataLoader
+        Data loader for a specific dataset (train or test).
+    device : torch.device
+        Specify which device (cpu or GPU) should be used for training.
+
+    Returns
+    -------
+    float
+        MSE loss of the model on the whole dataset.
+    """
+    val_loss = 0
+    for data, target in data_loader:
+        data = data.to(device)
+        target = target.to(device)
+        feat, _ = model(data)
+        predict = clf.predict(feat)
+        loss = F.mse_loss(
+            torch.tensor(predict, dtype=torch.float),
+            target.type(torch.float),
+        )
         val_loss += loss
 
     validation_loss = val_loss / len(data_loader)
@@ -108,7 +148,7 @@ def layer_wise_train(model, device, train_loader, lr, epoch, loss_fn=F.mse_loss)
             continue
         # recreate model to have just one learnable layer
         model = TiedAutoEncoder(current_shape_list, nonlinearity=torch.relu)
-        print("training .... \n", model)
+        log.info(f"training .... \n {model}")
         # load prev weights
         model.load_state_dict(weight_state_dict, strict=False)
 
@@ -166,42 +206,41 @@ def train_genetic_model(
     """
 
     # Generate choromosomes
-    print(f"\nGenerated {pop_size} models with {shape_list} layer size! ")
+    log.info(f"\nGenerated {pop_size} models with {shape_list} layer size! ")
     models = [
         GeneticTiedAutoEncoder(shape_list, nonlinearity=torch.relu)
         for i in range(pop_size)
     ]
 
     # Load prevoius layer weights
-    print()
     if prev_weights is not None:
         for model in models:
             model.load_state_dict(prev_weights, strict=False)
         shapes = []
         for key_weight in prev_weights:
             shapes.append(prev_weights[key_weight].shape)
-        print(f"\nLoaded prevoius layer weights with shape {shapes}")
+        log.info(f"\nLoaded prevoius layer weights with shape {shapes}")
 
     layer_key = next(reversed(models[0].state_dict()))  # last layer key
-    print(
+    log.info(
         f"\nTraining {layer_key} with shape of {models[0].state_dict()[layer_key].shape} : "
     )
 
     for g in range(generations):
-        print(f"\nGeneration {g + 1}: \n")
-        print("Calculating fitness for each chromosome...")
+        log.info(f"\nGeneration {g + 1}: \n")
+        log.info("Calculating fitness for each chromosome...")
         # fitness
         fitness = []
         for model in models:
             fitness.append(1 / evaluate_loss(model, train_loader, device))
-
+        log.info(f"The fitness values in begining: {fitness}")
         # Select 5 best models (/chromosomes)
         fit_arg = np.argsort(fitness)
         selected_models = [models[f] for f in fit_arg[: pop_size // 2]]
-        print(f"Selected {pop_size // 2} Top best chromosomes")
+        log.info(f"Selected {pop_size // 2} Top best chromosomes")
 
         # finetune selected models
-        print("Finetuning selected models...\n")
+        log.info("Finetuning selected models...\n")
         for model in selected_models:
             # freeze network except the chromosome layer
             for name, param in model.named_parameters():
@@ -214,9 +253,8 @@ def train_genetic_model(
             optimizer = optim.Adadelta(model.parameters(), lr=finetune_lr)
             for epoch in range(1, finetune_epoch + 1):
                 train(model, device, train_loader, optimizer, epoch, loss_fn)
-
         # cross over and mutation
-        print(
+        log.info(
             f"Generate {pop_size // 2} other chromosomes with Cross-Over and Mutation\n"
         )
         for _ in range(pop_size // 2):
@@ -230,13 +268,15 @@ def train_genetic_model(
         models = selected_models
 
     fitness = []
-    print("Selecting best chromosome as answer...")
+    log.info("Selecting best chromosome as answer...")
     # fitness
     for model in models:
         fitness.append(1 / evaluate_loss(model, train_loader, device))
     fit_arg = np.argsort(fitness)
+    log.info(f"The fitness values of last generation: {fitness}")
     best_model = models[fit_arg[-1]]
-    print("Finished")
+    log.info(f"The total loss for the train dataset is: {1/fitness[fit_arg[-1]]}")
+    log.info(f"Finished the training for chromosome {layer_key}")
     return best_model
 
 
@@ -303,6 +343,27 @@ def layerwise_genetic_train(
     return model
 
 
+def draw_sample_output(model, data_sample, path):
+    """draw and save output reconstructed image.
+
+    Parameters
+    ----------
+    model : torch.model
+        The model for calculating the reconstruction.
+    data_sample : np.array
+        The unsqueezed image.
+    path : str
+        Path for saving the output image.
+    """
+    _, reconstructed_output = model(data_sample)
+    fig = plt.figure()
+    ax1 = fig.add_subplot(2, 1, 1)
+    ax1.imshow(data_sample.squeeze())
+    ax2 = fig.add_subplot(2, 1, 2)
+    ax2.imshow(reconstructed_output.detach().numpy().reshape(28, 28))
+    fig.savefig(path)
+
+
 @hydra.main(version_base=None, config_path="../configs", config_name="config")
 def main(cfg: DictConfig):
     transform = transforms.Compose([transforms.ToTensor()])
@@ -319,17 +380,77 @@ def main(cfg: DictConfig):
     test_loader = torch.utils.data.DataLoader(
         test_dataset, batch_size=cfg.batch_size, shuffle=True
     )
+    # train the autoencoder using genetic or sgd
+    if cfg.method == "genetic":
+        model = layerwise_genetic_train(
+            cfg.shape_list,
+            train_loader,
+            cfg.pop_size,
+            cfg.generations,
+            device,
+            cfg.finetune_epoch,
+            cfg.finetune_lr,
+        )
+        # model = GeneticTiedAutoEncoder(cfg.shape_list, nonlinearity=torch.relu)
+    elif cfg.method == "sgd":
+        model = TiedAutoEncoder(cfg.shape_list, nonlinearity=torch.relu)
+        layer_wise_train(
+            model, device, train_loader, cfg.lr, cfg.epochs, loss_fn=F.mse_loss
+        )
+    # save the model
+    out_path = os.path.join(cfg.output_dir, cfg.model_name)
+    # create the dir if not exist
+    if not os.path.exists(out_path):
+        os.makedirs(out_path)
+    model.save(out_path)
 
-    model = layerwise_genetic_train(
-        cfg.shape_list,
-        train_loader,
-        cfg.pop_size,
-        cfg.generations,
-        device,
-        cfg.finetune_epoch,
-        cfg.finetune_lr,
+    # unsuperwised model validation
+    data_sample = train_dataset[2][0]
+    draw_sample_output(model, data_sample, os.path.join(out_path, "recons_img.png"))
+
+    # evaluate the unsuperwised model for reconstruction
+    if cfg.evaluate:
+        log.info(
+            f"The total loss for the test dataset is: {evaluate_loss(model, test_loader, device)}"
+        )
+
+    # train the classification head (svm)
+    all_encoded_feats = []
+    all_targets = []
+    clf = svm.SVC(gamma="scale", kernel="rbf")
+
+    for data, target in train_loader:
+        data = data.to(device)
+        target = target.to(device)
+        encoded_feats, _ = model(data)
+        all_encoded_feats.append(encoded_feats)
+        all_targets.append(target)
+
+    all_encoded_feats = np.concatenate(all_encoded_feats, axis=0)
+    all_targets = np.concatenate(all_targets, axis=0)
+
+    clf.fit(all_encoded_feats[:10], all_targets[:10])
+    predicts = clf.predict(all_encoded_feats)
+    print("predicts", predicts)
+    print("all_targets", all_targets)
+    loss = F.mse_loss(
+        torch.tensor(predicts, dtype=torch.float),
+        torch.tensor(all_targets, dtype=torch.float),
     )
+    log.info(f"The total classification loss for the train dataset is: {loss}")
 
+    # save the superwised model
+    pickle.dump(clf, open(os.path.join(out_path, "svm_weights.pickle"), "wb"))
+    log.info("Saved SVM Sucessfully!")
+
+    # evaluate the superwised model for classification
+    if cfg.evaluate:
+        classification_loss = evaluate_classification_model(
+            model, clf, test_loader, device
+        )
+        log.info(
+            f"The total classification loss for the test dataset is: {classification_loss}"
+        )
     return model
 
 

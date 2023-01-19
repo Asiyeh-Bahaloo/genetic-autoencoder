@@ -1,6 +1,10 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import logging
+
+log = logging.getLogger(__name__)
 
 
 class TiedLinearLayer(nn.Module):
@@ -109,6 +113,16 @@ class TiedAutoEncoder(nn.Module):
                 x = self.nonlinearity(x)
         reconstructed_output = x
         return encoded_feats, reconstructed_output
+
+    def save(self, output_folder):
+        output_path = os.path.join(output_folder, "ae_weights.pth")
+        torch.save(self.state_dict(), output_path)
+        log.info(f"Saved Autoencoder in {output_path}")
+
+    def load(self, folder_path):
+        output_path = os.path.join(folder_path, "ae_weights.pth")
+        self.load_state_dict(output_path)
+        log.info(f"Loaded Autoencoder from {output_path}")
 
 
 class GeneticTiedAutoEncoder(TiedAutoEncoder):
