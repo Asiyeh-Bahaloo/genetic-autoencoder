@@ -121,7 +121,7 @@ class TiedAutoEncoder(nn.Module):
 
     def load(self, folder_path):
         output_path = os.path.join(folder_path, "ae_weights.pth")
-        self.load_state_dict(output_path)
+        self.load_state_dict(torch.load(output_path))
         log.info(f"Loaded Autoencoder from {output_path}")
 
 
@@ -141,7 +141,8 @@ class GeneticTiedAutoEncoder(TiedAutoEncoder):
         layer_key : str
             The name of the layer that contains the learning chromosome.
         p : float
-            The probability of crossover. Means how many of the weights should taken from one parent.
+            The probability of crossover. Means how many of the weights should taken from one
+            parent.
 
         Returns
         -------

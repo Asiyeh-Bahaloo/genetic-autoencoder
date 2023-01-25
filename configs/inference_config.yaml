@@ -1,0 +1,5 @@
+data_path: "./dgfg.png"
+output_dir: "./outputs/test1"
+weights_folder: "./outputs/test1"
+device: "cpu"
+shape_list: [784, 20, 10 , 5]

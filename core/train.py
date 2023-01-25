@@ -161,6 +161,7 @@ def layer_wise_train(model, device, train_loader, lr, epoch, loss_fn=F.mse_loss)
             train(model, device, train_loader, optimizer, epoch, loss_fn)
         # update weights
         weight_state_dict = model.state_dict()
+    log.info("The whole autoencoder has been trained using SGD algorithm")
 
 
 def train_genetic_model(
@@ -340,6 +341,7 @@ def layerwise_genetic_train(
         )
         # update the previous weights
         weight_state_dict = model.state_dict()
+    log.info("The whole autoencoder has been trained using genetic algorithm")
     return model
 
 
@@ -366,6 +368,7 @@ def draw_sample_output(model, data_sample, path):
 
 @hydra.main(version_base=None, config_path="../configs", config_name="config")
 def main(cfg: DictConfig):
+    # create data loaders
     transform = transforms.Compose([transforms.ToTensor()])
     device = torch.device(cfg.device)
     train_dataset = datasets.MNIST(
@@ -430,6 +433,7 @@ def main(cfg: DictConfig):
     all_targets = np.concatenate(all_targets, axis=0)
 
     clf.fit(all_encoded_feats[:10], all_targets[:10])
+    # evaluate the classification head on train set
     predicts = clf.predict(all_encoded_feats)
     print("predicts", predicts)
     print("all_targets", all_targets)
@@ -443,7 +447,7 @@ def main(cfg: DictConfig):
     pickle.dump(clf, open(os.path.join(out_path, "svm_weights.pickle"), "wb"))
     log.info("Saved SVM Sucessfully!")
 
-    # evaluate the superwised model for classification
+    # evaluate the classification head on test set
     if cfg.evaluate:
         classification_loss = evaluate_classification_model(
             model, clf, test_loader, device
