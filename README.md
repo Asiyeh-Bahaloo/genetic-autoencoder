@@ -1,3 +1,6 @@
+![pytorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-%23F7931E.svg?style=for-the-badge&logo=scikit-learn&logoColor=white)
+[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/Asiyeh-Bahaloo/genetic-autoencoder/graphs/commit-activity)
 # Genetic Algorithms for Evolving Deep Neural Networks
 This repository contains the unofficial implementation of the [paper](https://https://arxiv.org/abs/1711.07655) "Genetic Algorithms for Evolving Deep Neural Networks" by Omid E. David and Iddo Greental. If you have ever wondered how one can use genetic algorithms (GAs) instead of conventional stochastic gradient descent (SGD), this is the right place to learn.
 
